@@ -6,3 +6,4 @@ data/
 .DS_Store
 coverage/
 .turbo/
+.repoframe/credentials.json

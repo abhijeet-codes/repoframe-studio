@@ -9,6 +9,7 @@ import { jobRoutes } from './routes/jobs.js';
 import { uploadRoutes } from './routes/upload.js';
 import { artifactRoutes } from './routes/artifacts.js';
 import { logRoutes } from './routes/logs.js';
+import { figmaRoutes } from './routes/figma.js';
 import { ensureDataDirs } from './storage/filesystem.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -44,6 +45,7 @@ export async function createServer() {
   await app.register(uploadRoutes, { prefix: '/api/upload' });
   await app.register(artifactRoutes, { prefix: '/api/artifacts' });
   await app.register(logRoutes, { prefix: '/api/logs' });
+  await app.register(figmaRoutes, { prefix: '/api/figma' });
 
   app.get('/api/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
 

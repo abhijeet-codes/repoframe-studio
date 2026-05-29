@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "repoframe-figma": {
+      "command": "node",
+      "args": ["packages/figma-mcp/dist/index.js"],
+      "env": {
+        "REPOFRAME_PROJECT_ROOT": ".",
+        "JOBS_DIR": "./data/jobs",
+        "ARTIFACTS_DIR": "./data/artifacts"
+      }
+    }
+  }
+}
