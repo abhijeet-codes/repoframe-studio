@@ -2,11 +2,13 @@ import { chromium, Browser, Page } from 'playwright';
 import { ChildProcess, spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import http from 'node:http';
 import { WorkspaceInfo, DOMNodeSnapshot } from '@repoframe/shared';
 import { appendLog, writeArtifactFile } from '../context.js';
 import net from 'node:net';
 
 const RENDER_TIMEOUT = parseInt(process.env.RENDER_TIMEOUT_MS || '60000', 10);
+const SERVER_START_TIMEOUT = parseInt(process.env.SERVER_START_TIMEOUT_MS || '60000', 10);
 const VIEWPORT_WIDTH = parseInt(process.env.VIEWPORT_WIDTH || '1440', 10);
 const VIEWPORT_HEIGHT = parseInt(process.env.VIEWPORT_HEIGHT || '900', 10);
 
