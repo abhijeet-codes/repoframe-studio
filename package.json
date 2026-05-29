@@ -12,7 +12,7 @@
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
     "clean": "pnpm -r clean && rm -rf node_modules",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "cd packages/backend && pnpm exec tsx ../../scripts/seed.ts"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
