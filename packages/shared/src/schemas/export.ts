@@ -62,7 +62,7 @@ export const FigmaNodeSchema: z.ZodType<FigmaNode> = z.lazy(() =>
         r: z.number(),
         g: z.number(),
         b: z.number(),
-        a: z.number().default(1),
+        a: z.number(),
       }).optional(),
     })).optional(),
     strokes: z.array(z.object({
@@ -71,7 +71,7 @@ export const FigmaNodeSchema: z.ZodType<FigmaNode> = z.lazy(() =>
         r: z.number(),
         g: z.number(),
         b: z.number(),
-        a: z.number().default(1),
+        a: z.number(),
       }).optional(),
     })).optional(),
     cornerRadius: z.number().optional(),

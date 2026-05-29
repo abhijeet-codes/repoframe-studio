@@ -166,8 +166,8 @@ async function extractDOMSnapshot(page: Page): Promise<DOMNodeSnapshot> {
       }
 
       const children: any[] = [];
-      for (const child of el.children) {
-        const result = traverse(child);
+      for (let i = 0; i < el.children.length; i++) {
+        const result = traverse(el.children[i]);
         if (result) children.push(result);
       }
 

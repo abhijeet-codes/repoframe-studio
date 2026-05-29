@@ -63,8 +63,8 @@ export const WireframeNodeSchema: z.ZodType<WireframeNode> = z.lazy(() =>
     type: WireframeNodeType,
     name: z.string().optional(),
     bounds: BoundingBox,
-    zIndex: z.number().default(0),
-    opacity: z.number().default(1),
+    zIndex: z.number(),
+    opacity: z.number(),
     borderRadius: z.number().optional(),
     padding: z.object({
       top: z.number(),
@@ -79,7 +79,7 @@ export const WireframeNodeSchema: z.ZodType<WireframeNode> = z.lazy(() =>
     backgroundColor: z.string().optional(),
     borderColor: z.string().optional(),
     borderWidth: z.number().optional(),
-    children: z.array(WireframeNodeSchema).default([]),
+    children: z.array(WireframeNodeSchema),
     metadata: z.record(z.string(), z.unknown()).optional(),
   })
 );
@@ -129,7 +129,7 @@ export const DOMNodeSnapshotSchema: z.ZodType<DOMNodeSnapshot> = z.lazy(() =>
     bounds: BoundingBox,
     computedStyles: z.record(z.string(), z.string()).optional(),
     isVisible: z.boolean(),
-    children: z.array(DOMNodeSnapshotSchema).default([]),
+    children: z.array(DOMNodeSnapshotSchema),
   })
 );
 

@@ -11,7 +11,8 @@
     "build": "pnpm --filter @repoframe/shared build && pnpm --filter @repoframe/backend build && pnpm --filter @repoframe/worker build && pnpm --filter @repoframe/frontend build",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
-    "clean": "pnpm -r clean && rm -rf node_modules"
+    "clean": "pnpm -r clean && rm -rf node_modules",
+    "seed": "tsx scripts/seed.ts"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
