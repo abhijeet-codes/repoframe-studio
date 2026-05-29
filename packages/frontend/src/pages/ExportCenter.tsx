@@ -1,10 +1,39 @@
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useJobArtifacts } from '../hooks/useJobs';
-import { Loader2, Download, FileJson, Image, FileText, FileCode } from 'lucide-react';
+import { apiGet, apiPost } from '../lib/api';
+import { Loader2, Download, FileJson, Image, FileText, FileCode, Upload, CheckCircle, XCircle } from 'lucide-react';
+
+interface FigmaSyncResult {
+  success: boolean;
+  figmaFileUrl?: string;
+  commentId?: string;
+  artifactUsed?: string;
+  error?: string;
+  payload?: { route: string; components: number; frames: number };
+}
 
 export function ExportCenterPage() {
   const { id } = useParams<{ id: string }>();
   const { data: artifacts, isLoading } = useJobArtifacts(id);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<FigmaSyncResult | null>(null);
+
+  async function handleSyncToFigma() {
+    if (!id) return;
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const result = await apiPost<FigmaSyncResult>('/figma/sync', {
+        jobId: id,
+        fidelity: 'lowfi',
+      });
+      setSyncResult(result);
+    } catch (err: any) {
+      setSyncResult({ success: false, error: err.message });
+    }
+    setSyncing(false);
+  }
 
   if (isLoading) {
     return (
@@ -69,6 +98,48 @@ export function ExportCenterPage() {
         <Download className="w-4 h-4" />
         Download All ({artifacts.length} files)
       </button>
+
+      {/* Figma Sync */}
+      <div className="card space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium">Sync to Figma</h2>
+          {syncResult?.success && (
+            <CheckCircle className="w-4 h-4 text-green-500" />
+          )}
+        </div>
+        <p className="text-xs text-[var(--color-text-secondary)]">
+          Push wireframe data to your Figma project. Requires Figma authentication (Settings → Figma).
+        </p>
+        {syncResult && (
+          <div className={`p-3 rounded-lg text-xs ${syncResult.success ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'}`}>
+            {syncResult.success ? (
+              <div className="space-y-1">
+                <p className="font-medium">Synced to Figma successfully!</p>
+                <p>Artifact: {syncResult.artifactUsed}</p>
+                <p>Frames: {syncResult.payload?.frames} | Components: {syncResult.payload?.components}</p>
+                <a
+                  href={syncResult.figmaFileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline font-medium"
+                >
+                  Open in Figma →
+                </a>
+              </div>
+            ) : (
+              <p>{syncResult.error}</p>
+            )}
+          </div>
+        )}
+        <button
+          className="btn-secondary w-full flex items-center justify-center gap-2"
+          onClick={handleSyncToFigma}
+          disabled={syncing}
+        >
+          {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+          {syncing ? 'Syncing...' : 'Push to Figma'}
+        </button>
+      </div>
     </div>
   );
 }

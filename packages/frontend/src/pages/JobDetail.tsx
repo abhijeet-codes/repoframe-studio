@@ -1,8 +1,10 @@
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useState } from 'react';
 import { useJob, useRetryStage } from '../hooks/useJobs';
+import { apiPost } from '../lib/api';
 import {
   Loader2, CheckCircle2, XCircle, AlertTriangle, Clock,
-  ArrowRight, Eye, Download, Bug, RotateCcw,
+  ArrowRight, Eye, Download, Bug, RotateCcw, Upload,
 } from 'lucide-react';
 
 export function JobDetailPage() {
@@ -10,6 +12,21 @@ export function JobDetailPage() {
   const { data: job, isLoading, error } = useJob(id);
   const retryStage = useRetryStage();
   const navigate = useNavigate();
+  const [figmaSyncing, setFigmaSyncing] = useState(false);
+  const [figmaResult, setFigmaResult] = useState<string | null>(null);
+
+  async function handleFigmaSync() {
+    if (!id) return;
+    setFigmaSyncing(true);
+    setFigmaResult(null);
+    try {
+      const result = await apiPost<{ success: boolean; figmaFileUrl: string }>('/figma/sync', { jobId: id });
+      setFigmaResult(result.figmaFileUrl);
+    } catch (err: any) {
+      setFigmaResult(`Error: ${err.message}`);
+    }
+    setFigmaSyncing(false);
+  }
 
   if (isLoading) {
     return (
@@ -52,6 +69,12 @@ export function JobDetailPage() {
               <Download className="w-3.5 h-3.5" /> Export
             </button>
           )}
+          {job.status === 'completed' && (
+            <button onClick={handleFigmaSync} disabled={figmaSyncing} className="btn-secondary text-xs">
+              {figmaSyncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+              {figmaSyncing ? 'Syncing...' : 'Sync to Figma'}
+            </button>
+          )}
           {job.errorSummary && (
             <button onClick={() => navigate(`/jobs/${id}/errors`)} className="btn-secondary text-xs">
               <Bug className="w-3.5 h-3.5" /> Errors
@@ -59,6 +82,15 @@ export function JobDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Figma sync result */}
+      {figmaResult && (
+        <div className={`p-3 rounded-lg text-xs ${figmaResult.startsWith('Error') ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300' : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'}`}>
+          {figmaResult.startsWith('Error') ? figmaResult : (
+            <span>Synced to Figma! <a href={figmaResult} target="_blank" rel="noreferrer" className="underline font-medium">Open in Figma →</a></span>
+          )}
+        </div>
+      )}
 
       {/* Info */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

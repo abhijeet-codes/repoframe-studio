@@ -7,3 +7,5 @@ data/
 coverage/
 .turbo/
 .repoframe/credentials.json
+packages/backend/.repoframe/credentials.json
+packages/backend/.repoframe/.credentails.json

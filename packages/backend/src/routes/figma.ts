@@ -1,11 +1,21 @@
 import { FastifyPluginAsync } from 'fastify';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const CREDENTIALS_PATH = path.resolve(
-  process.env.REPOFRAME_PROJECT_ROOT || process.cwd(),
-  '.repoframe/credentials.json'
-);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Resolve project root: walk up from packages/backend/src/routes/ to repo root
+function getProjectRoot(): string {
+  if (process.env.REPOFRAME_PROJECT_ROOT) {
+    return path.resolve(process.env.REPOFRAME_PROJECT_ROOT);
+  }
+  // Walk up from this file to find the repo root (has pnpm-workspace.yaml)
+  let dir = path.resolve(__dirname, '..', '..', '..', '..');
+  return dir;
+}
+
+const CREDENTIALS_PATH = path.join(getProjectRoot(), '.repoframe/credentials.json');
 
 interface Credentials {
   figma?: {
@@ -109,5 +119,148 @@ export const figmaRoutes: FastifyPluginAsync = async (app) => {
     }
 
     return res.json();
+  });
+
+  // List files in the project
+  app.get('/files', async (_, reply) => {
+    const creds = await loadCredentials();
+    const token = creds.figma?.personalAccessToken;
+    const projectId = creds.figma?.projectId;
+    if (!token) {
+      return reply.status(401).send({ error: 'Not authenticated with Figma' });
+    }
+    if (!projectId) {
+      return reply.status(400).send({ error: 'No project ID configured. Update Figma settings.' });
+    }
+
+    const res = await fetch(`https://api.figma.com/v1/projects/${projectId}/files`, {
+      headers: { 'X-Figma-Token': token },
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      return reply.status(res.status).send({ error: `Figma API: ${body}` });
+    }
+    const data = await res.json() as { files: Array<{ key: string; name: string; last_modified: string }> };
+    return data.files || [];
+  });
+
+  // Sync wireframe to Figma (posts as comment with structured data)
+  app.post<{
+    Body: { jobId: string; fileKey?: string; route?: string; fidelity?: string };
+  }>('/sync', async (request, reply) => {
+    const { jobId, fileKey, route = '/', fidelity = 'lowfi' } = request.body;
+    const creds = await loadCredentials();
+    const token = creds.figma?.personalAccessToken;
+    if (!token) {
+      return reply.status(401).send({ error: 'Not authenticated with Figma' });
+    }
+
+    // Load the figma export artifact
+    const artifactsDir = path.resolve(
+      process.env.ARTIFACTS_DIR || path.join(getProjectRoot(), 'data/artifacts'),
+      jobId
+    );
+
+    const sanitizedRoute = route.replace(/[^a-zA-Z0-9]/g, '_').replace(/^_+|_+$/g, '') || 'index';
+    const possibleFilenames = [
+      `figma-export-${fidelity}-${sanitizedRoute}.json`,
+      `figma-export-${fidelity}-_${sanitizedRoute}.json`,
+      `figma-export-${sanitizedRoute}.json`,
+    ];
+
+    let payload: any = null;
+    let usedFilename = '';
+    for (const fname of possibleFilenames) {
+      try {
+        const content = await fs.readFile(path.join(artifactsDir, fname), 'utf-8');
+        payload = JSON.parse(content);
+        usedFilename = fname;
+        break;
+      } catch {}
+    }
+
+    // If no specific figma export, try to find any figma-export file
+    if (!payload) {
+      try {
+        const files = await fs.readdir(artifactsDir);
+        const figmaFile = files.find(f => f.startsWith('figma-export') && f.endsWith('.json'));
+        if (figmaFile) {
+          const content = await fs.readFile(path.join(artifactsDir, figmaFile), 'utf-8');
+          payload = JSON.parse(content);
+          usedFilename = figmaFile;
+        }
+      } catch {}
+    }
+
+    if (!payload) {
+      return reply.status(404).send({
+        error: `No Figma export found for job ${jobId}. Run the pipeline first to generate wireframes.`,
+      });
+    }
+
+    // Determine target file
+    let targetFileKey = fileKey;
+    if (!targetFileKey) {
+      // Get first file from project
+      const projectId = creds.figma?.projectId;
+      if (!projectId) {
+        return reply.status(400).send({ error: 'No fileKey provided and no project configured.' });
+      }
+      const filesRes = await fetch(`https://api.figma.com/v1/projects/${projectId}/files`, {
+        headers: { 'X-Figma-Token': token },
+      });
+      if (!filesRes.ok) {
+        return reply.status(filesRes.status).send({ error: 'Failed to list Figma files' });
+      }
+      const filesData = await filesRes.json() as { files: Array<{ key: string; name: string }> };
+      if (!filesData.files || filesData.files.length === 0) {
+        return reply.status(404).send({ error: 'No files found in Figma project. Create a file in Figma first.' });
+      }
+      targetFileKey = filesData.files[0].key;
+    }
+
+    // Post wireframe data as a structured comment to the Figma file
+    const commentBody = {
+      message: `[RepoFrame Wireframe Export]\n` +
+        `Job: ${jobId}\n` +
+        `Route: ${route}\n` +
+        `Fidelity: ${fidelity}\n` +
+        `File: ${usedFilename}\n` +
+        `Exported: ${new Date().toISOString()}\n\n` +
+        `Wireframe structure (${payload.document?.children?.length || 0} top-level frames, ` +
+        `${Object.keys(payload.components || {}).length} components):\n\n` +
+        `\`\`\`json\n${JSON.stringify(payload, null, 2).slice(0, 4000)}\n\`\`\``,
+    };
+
+    const commentRes = await fetch(`https://api.figma.com/v1/files/${targetFileKey}/comments`, {
+      method: 'POST',
+      headers: {
+        'X-Figma-Token': token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(commentBody),
+    });
+
+    if (!commentRes.ok) {
+      const errBody = await commentRes.text();
+      return reply.status(commentRes.status).send({
+        error: `Figma API rejected the sync: ${errBody}`,
+      });
+    }
+
+    const comment = await commentRes.json() as { id: string; file_key: string };
+
+    return reply.status(200).send({
+      success: true,
+      figmaFileKey: targetFileKey,
+      figmaFileUrl: `https://www.figma.com/file/${targetFileKey}`,
+      commentId: comment.id,
+      artifactUsed: usedFilename,
+      payload: {
+        route: payload.route,
+        components: Object.keys(payload.components || {}).length,
+        frames: payload.document?.children?.length || 0,
+      },
+    });
   });
 };
