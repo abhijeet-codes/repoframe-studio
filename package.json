@@ -1,0 +1,24 @@
+{
+  "name": "repoframe-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Generate editable wireframes from any GitHub repo or ZIP upload",
+  "scripts": {
+    "dev": "concurrently \"pnpm --filter @repoframe/backend dev\" \"pnpm --filter @repoframe/worker dev\" \"pnpm --filter @repoframe/frontend dev\"",
+    "dev:backend": "pnpm --filter @repoframe/backend dev",
+    "dev:worker": "pnpm --filter @repoframe/worker dev",
+    "dev:frontend": "pnpm --filter @repoframe/frontend dev",
+    "build": "pnpm --filter @repoframe/shared build && pnpm --filter @repoframe/backend build && pnpm --filter @repoframe/worker build && pnpm --filter @repoframe/frontend build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "clean": "pnpm -r clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}
