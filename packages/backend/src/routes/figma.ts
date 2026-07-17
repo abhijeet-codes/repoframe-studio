@@ -22,6 +22,7 @@ interface Credentials {
     personalAccessToken: string;
     teamId?: string;
     projectId?: string;
+    defaultFileKey?: string;
   };
 }
 
@@ -201,22 +202,27 @@ export const figmaRoutes: FastifyPluginAsync = async (app) => {
     // Determine target file
     let targetFileKey = fileKey;
     if (!targetFileKey) {
-      // Get first file from project
-      const projectId = creds.figma?.projectId;
-      if (!projectId) {
-        return reply.status(400).send({ error: 'No fileKey provided and no project configured.' });
+      // Try default file key from credentials
+      if (creds.figma?.defaultFileKey) {
+        targetFileKey = creds.figma.defaultFileKey;
+      } else {
+        // Get first file from project
+        const projectId = creds.figma?.projectId;
+        if (!projectId) {
+          return reply.status(400).send({ error: 'No fileKey provided and no project configured.' });
+        }
+        const filesRes = await fetch(`https://api.figma.com/v1/projects/${projectId}/files`, {
+          headers: { 'X-Figma-Token': token },
+        });
+        if (!filesRes.ok) {
+          return reply.status(filesRes.status).send({ error: 'Failed to list Figma files' });
+        }
+        const filesData = await filesRes.json() as { files: Array<{ key: string; name: string }> };
+        if (!filesData.files || filesData.files.length === 0) {
+          return reply.status(404).send({ error: 'No files found in Figma project. Create a file in Figma first.' });
+        }
+        targetFileKey = filesData.files[0].key;
       }
-      const filesRes = await fetch(`https://api.figma.com/v1/projects/${projectId}/files`, {
-        headers: { 'X-Figma-Token': token },
-      });
-      if (!filesRes.ok) {
-        return reply.status(filesRes.status).send({ error: 'Failed to list Figma files' });
-      }
-      const filesData = await filesRes.json() as { files: Array<{ key: string; name: string }> };
-      if (!filesData.files || filesData.files.length === 0) {
-        return reply.status(404).send({ error: 'No files found in Figma project. Create a file in Figma first.' });
-      }
-      targetFileKey = filesData.files[0].key;
     }
 
     // Post wireframe data as a structured comment to the Figma file
